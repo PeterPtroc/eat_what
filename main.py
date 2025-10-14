@@ -66,7 +66,7 @@ class EatPlugin(Star):
             tip = "先用 /增加菜品 添加吧" if not location else f"地点 {location} 下暂无菜品"
             yield event.plain_result(f"没找到合适的菜品，{tip}")
             return
-        yield event.plain_result(f"{dish.times}吃{dish.location}的{dish.name} ")
+        yield event.plain_result(f"{'/'.join(dish.times)}吃{dish.location}的{dish.name} ")
 
     @filter.command("删除菜品")
     async def delete_dish(self, event: AstrMessageEvent, name: str):
