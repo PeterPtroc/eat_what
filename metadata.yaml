@@ -1,0 +1,6 @@
+name: astrbot_plugin_eat
+desc: 今天吃什么
+help: 使用 /吃什么帮助 查看指令说明
+version: v0.1.0
+author: Ptroc
+repo: https://github.com/PeterPtroc/eat_what
