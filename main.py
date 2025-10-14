@@ -9,6 +9,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 from .services.dish_service import DishStorageService, current_time_slot
+from .models.dish import VALID_TIME_SLOTS
 
 
 @register("eat", "AstrBot", "今天吃什么", "0.1.0")
@@ -36,7 +37,13 @@ class EatPlugin(Star):
         return False
 
     @filter.command("增加菜品")
-    async def add_or_extend_dish(self, event: AstrMessageEvent, name: str, location: str, time_slot: str):
+    async def add_or_extend_dish(
+        self,
+        event: AstrMessageEvent,
+        name: str = "",
+        location: str = "",
+        time_slot: str = "",
+    ):
         """添加新菜品或为已存在菜品追加时间段
 
         用法: /增加菜品 名称 地点 时间(中午/晚上)
@@ -44,11 +51,45 @@ class EatPlugin(Star):
         if not self._dish_storage:
             yield event.plain_result("菜品存储未就绪")
             return
-        if not name or not location or not time_slot:
-            usage = "用法: /增加菜品 名称 地点 时间(中午/晚上)"
-            yield event.plain_result(f"参数不完整\n{usage}")
+
+        # 标准用法与示例
+        usage = "用法: /增加菜品 名称 地点 时间(中午/晚上)"
+        example = "示例: /增加菜品 大勺炒饭 小西门 晚上"
+
+        # 缺参详尽提示
+        missing = []
+        if not name:
+            missing.append("name(菜名)")
+        if not location:
+            missing.append("location(地点)")
+        if not time_slot:
+            missing.append("time_slot(时间段)")
+
+        if missing:
+            # 如果一个参数都没给，直接给帮助
+            if len(missing) == 3:
+                yield event.plain_result(
+                    "需要三个参数: 名称 地点 时间(中午/晚上)\n" f"{usage}\n{example}"
+                )
+                return
+            # 指出具体缺少哪些
+            yield event.plain_result(
+                "缺少参数: "
+                + ", ".join(missing)
+                + "\n"
+                + f"{usage}\n{example}"
+            )
             return
-        msg = self._dish_storage.add_dish(name, location, time_slot)
+
+        # 规范化时间段
+        ts = time_slot.strip()
+        if ts not in VALID_TIME_SLOTS:
+            yield event.plain_result(
+                "时间段只能为: " + "/".join(VALID_TIME_SLOTS)
+            )
+            return
+
+        msg = self._dish_storage.add_dish(name, location, ts)
         yield event.plain_result(msg)
 
     @filter.command("吃什么")
