@@ -48,6 +48,17 @@ class EatPlugin(Star):
                 return str(val)
         return None
 
+    def _extract_args(self, event: AstrMessageEvent, command: str) -> str:
+        """从原始消息中提取命令后的参数文本"""
+        raw = getattr(event, "message_str", "") or getattr(event, "raw_message", "")
+        if not raw:
+            return ""
+        for prefix in (f"/{command}", command):
+            idx = raw.find(prefix)
+            if idx != -1:
+                return raw[idx + len(prefix):].strip()
+        return ""
+
     # ──────────────── 菜品管理 ────────────────
 
     @filter.command("增加菜品")
@@ -193,7 +204,7 @@ class EatPlugin(Star):
         yield event.plain_result(f"菜品数据 ({count} 条):\n{data}")
 
     @filter.command("导入菜品")
-    async def import_dishes(self, event: AstrMessageEvent, *args: str):
+    async def import_dishes(self, event: AstrMessageEvent):
         """从 JSON 导入菜品数据 (管理员限定)
 
         用法: /导入菜品 <JSON数据>
@@ -206,21 +217,7 @@ class EatPlugin(Star):
             yield event.plain_result("菜品存储未就绪")
             return
 
-        # 优先从原始消息提取 JSON（兼容多行格式）
-        json_text = ""
-        raw = getattr(event, "message_str", "") or getattr(event, "raw_message", "")
-        if raw:
-            # 去掉命令前缀，取剩余部分
-            for prefix in ("/导入菜品", "导入菜品"):
-                idx = raw.find(prefix)
-                if idx != -1:
-                    json_text = raw[idx + len(prefix):].strip()
-                    break
-
-        # 回退到 *args 拼接
-        if not json_text and args:
-            json_text = " ".join(args)
-
+        json_text = self._extract_args(event, "导入菜品")
         if not json_text:
             yield event.plain_result(
                 "请在命令后粘贴 JSON 数据\n"
@@ -234,7 +231,7 @@ class EatPlugin(Star):
     # ──────────────── 定时推荐 ────────────────
 
     @filter.command("定时推荐")
-    async def enable_schedule(self, event: AstrMessageEvent, *times: str):
+    async def enable_schedule(self, event: AstrMessageEvent):
         """为当前群开启定时推荐，可自定义时间 (管理员限定)
 
         用法: /定时推荐 [HH:MM ...]
@@ -254,9 +251,10 @@ class EatPlugin(Star):
             return
 
         custom_times = None
-        if times:
+        time_str = self._extract_args(event, "定时推荐")
+        if time_str:
             try:
-                custom_times = [_parse_time(t) for t in times]
+                custom_times = [_parse_time(t) for t in time_str.split()]
             except ValueError as e:
                 yield event.plain_result(str(e))
                 return
