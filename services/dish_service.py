@@ -125,6 +125,69 @@ class DishStorageService:
             grouped[d.location].append(d)
         return dict(grouped)
 
+    async def export_json(self) -> str:
+        """导出全部菜品为 JSON 字符串"""
+        async with self._lock:
+            data = [dish.to_dict() for dish in self._dishes.values()]
+            return json.dumps(data, ensure_ascii=False, indent=2)
+
+    async def import_json(self, text: str) -> str:
+        """从 JSON 字符串导入菜品，与现有数据合并
+
+        返回操作结果摘要。
+        """
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            return f"JSON 解析失败: {e}"
+
+        if not isinstance(data, list):
+            return "格式错误: 需要一个 JSON 数组"
+
+        added = 0
+        updated = 0
+        skipped = 0
+        errors = []
+
+        async with self._lock:
+            for i, item in enumerate(data):
+                if not isinstance(item, dict):
+                    errors.append(f"第 {i+1} 项不是对象，已跳过")
+                    skipped += 1
+                    continue
+                try:
+                    dish = Dish.from_dict(item)
+                except (ValueError, KeyError) as e:
+                    errors.append(f"第 {i+1} 项无效: {e}")
+                    skipped += 1
+                    continue
+
+                if dish.name in self._dishes:
+                    existing = self._dishes[dish.name]
+                    new_times = [t for t in dish.times if t not in existing.times]
+                    if new_times:
+                        existing.times.extend(new_times)
+                        updated += 1
+                    else:
+                        skipped += 1
+                else:
+                    self._dishes[dish.name] = dish
+                    added += 1
+
+            self._persist_sync()
+
+        parts = []
+        if added:
+            parts.append(f"新增 {added}")
+        if updated:
+            parts.append(f"更新 {updated}")
+        if skipped:
+            parts.append(f"跳过 {skipped}")
+        summary = "导入完成: " + "、".join(parts) if parts else "无有效数据"
+        if errors:
+            summary += "\n" + "\n".join(errors[:5])
+        return summary
+
 
 # 时间段判断
 

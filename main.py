@@ -171,6 +171,51 @@ class EatPlugin(Star):
         lines.append(f"\n共 {total} 道菜品")
         yield event.plain_result("\n".join(lines))
 
+    # ──────────────── 数据导入导出 ────────────────
+
+    @filter.command("导出菜品")
+    async def export_dishes(self, event: AstrMessageEvent):
+        """导出全部菜品数据为 JSON (管理员限定)
+
+        用法: /导出菜品
+        """
+        if not self._is_admin(event):
+            yield event.plain_result("只有管理员可导出菜品")
+            return
+        if not self._dish_storage:
+            yield event.plain_result("菜品存储未就绪")
+            return
+        count = await self._dish_storage.count()
+        if count == 0:
+            yield event.plain_result("菜品库为空，无数据可导出")
+            return
+        data = await self._dish_storage.export_json()
+        yield event.plain_result(f"菜品数据 ({count} 条):\n{data}")
+
+    @filter.command("导入菜品")
+    async def import_dishes(self, event: AstrMessageEvent, *args: str):
+        """从 JSON 导入菜品数据 (管理员限定)
+
+        用法: /导入菜品 <JSON数据>
+        示例: /导入菜品 [{"name":"炒饭","location":"食堂","times":["中午"]}]
+        """
+        if not self._is_admin(event):
+            yield event.plain_result("只有管理员可导入菜品")
+            return
+        if not self._dish_storage:
+            yield event.plain_result("菜品存储未就绪")
+            return
+        if not args:
+            yield event.plain_result(
+                "请在命令后粘贴 JSON 数据\n"
+                "格式: /导入菜品 [JSON]\n"
+                '示例: /导入菜品 [{"name":"炒饭","location":"食堂","times":["中午"]}]'
+            )
+            return
+        json_text = " ".join(args)
+        result = await self._dish_storage.import_json(json_text)
+        yield event.plain_result(result)
+
     # ──────────────── 定时推荐 ────────────────
 
     @filter.command("定时推荐")
@@ -232,8 +277,10 @@ class EatPlugin(Star):
             "2) /吃什么 [地点] — 随机推荐\n"
             "3) /菜单 [地点] — 查看菜品列表\n"
             "4) /删除菜品 名称 (管理员)\n"
-            "5) /定时推荐 [HH:MM ...] — 开启/更新定时推荐 (管理员)\n"
-            "6) /取消定时推荐 — 关闭定时推荐 (管理员)\n"
+            "5) /导出菜品 — 导出 JSON 数据 (管理员)\n"
+            "6) /导入菜品 <JSON> — 导入数据 (管理员)\n"
+            "7) /定时推荐 [HH:MM ...] — 开启定时推荐 (管理员)\n"
+            "8) /取消定时推荐 — 关闭定时推荐 (管理员)\n"
             "\n"
             "时间段: 08:00-14:00=中午 其它都是晚上\n"
             "地点支持模糊匹配，如 /吃什么 西门\n"
