@@ -6,7 +6,7 @@ from typing import Optional
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star, StarTools, register
 
 from .services.dish_service import DishStorageService, current_time_slot
 from .services.scheduler import ScheduledRecommender, _parse_time
@@ -22,11 +22,9 @@ class EatPlugin(Star):
 
     async def initialize(self):
         try:
-            base_dir = (
-                self.context.get_plugin_data_dir()
-                if hasattr(self.context, "get_plugin_data_dir")
-                else "."
-            )
+            data_dir = StarTools.get_data_dir()
+            data_dir.mkdir(parents=True, exist_ok=True)
+            base_dir = str(data_dir)
             self._dish_storage = DishStorageService(base_dir)
             self._scheduler = ScheduledRecommender(
                 self.context, self._dish_storage, base_dir
