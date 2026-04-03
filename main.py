@@ -197,7 +197,7 @@ class EatPlugin(Star):
         """从 JSON 导入菜品数据 (管理员限定)
 
         用法: /导入菜品 <JSON数据>
-        示例: /导入菜品 [{"name":"炒饭","location":"食堂","times":["中午"]}]
+        支持单行或多行 JSON
         """
         if not self._is_admin(event):
             yield event.plain_result("只有管理员可导入菜品")
@@ -205,14 +205,29 @@ class EatPlugin(Star):
         if not self._dish_storage:
             yield event.plain_result("菜品存储未就绪")
             return
-        if not args:
+
+        # 优先从原始消息提取 JSON（兼容多行格式）
+        json_text = ""
+        raw = getattr(event, "message_str", "") or getattr(event, "raw_message", "")
+        if raw:
+            # 去掉命令前缀，取剩余部分
+            for prefix in ("/导入菜品", "导入菜品"):
+                idx = raw.find(prefix)
+                if idx != -1:
+                    json_text = raw[idx + len(prefix):].strip()
+                    break
+
+        # 回退到 *args 拼接
+        if not json_text and args:
+            json_text = " ".join(args)
+
+        if not json_text:
             yield event.plain_result(
                 "请在命令后粘贴 JSON 数据\n"
                 "格式: /导入菜品 [JSON]\n"
                 '示例: /导入菜品 [{"name":"炒饭","location":"食堂","times":["中午"]}]'
             )
             return
-        json_text = " ".join(args)
         result = await self._dish_storage.import_json(json_text)
         yield event.plain_result(result)
 
